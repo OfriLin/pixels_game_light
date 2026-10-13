@@ -1,0 +1,2282 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>פיקסל אחר פיקסל</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%2315171B'/%3E%3Crect x='1' y='1' width='6.5' height='6.5' fill='%23FF0000'/%3E%3Crect x='8.5' y='1' width='6.5' height='6.5' fill='%2300FF00'/%3E%3Crect x='1' y='8.5' width='6.5' height='6.5' fill='%230000FF'/%3E%3Crect x='8.5' y='8.5' width='6.5' height='6.5' fill='%23FFFFFF'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Hebrew:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<style>
+/* ===================== צבעים וגופנים ===================== */
+:root {
+  --paper: #FFFFFF;
+  --canvas: #B7BBC1;          /* רקע אפור ניטרלי, כמו בתוכנות עריכת תמונה */
+  --canvas-ink: #15171B;
+  --canvas-ok: #EEF9F1;       /* רקע התמונות כשהתשובה נכונה */
+  --canvas-bad: #FDF0F0;      /* רקע התמונות כשהתשובה לא נכונה */
+  --gold: #F5B800;            /* שאלות אתגר */
+  --gold-bg: #FFE9A8;
+  --gold-hover: #FFDD7A;
+  --gold-text: #7A5000;
+  --ink: #15171B;
+  --muted: #5F656F;
+  --line: #15171B;
+  --line-soft: #D6D9DE;
+  --code-bg: #F3F4F6;
+  --sel: #CCD5FF;
+  --accent: #1238FF;
+  --accent-ink: #FFFFFF;
+  --grid-line: #15171B;
+  --verdict-ink: #FFFFFF;
+  --ok: #0B7A3B;   --ok-bg: #E4F4EA;
+  --bad: #C0102C;  --bad-bg: #FCE8EB;
+  --warn: #9A4D00; --warn-bg: #FCF0DE;
+  --check-a: #FFFFFF; --check-b: #D9DCE0;
+  --syn-kw: #1238FF; --syn-num: #B3261E; --syn-str: #0B7A3B;
+  --syn-com: #767C86; --syn-def: #7A2BC9; --syn-builtin: #8A5300;
+
+  --sans: "IBM Plex Sans Hebrew", "Segoe UI", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Consolas, "Courier New", monospace;
+  --header-h: 68px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #1A1C20;
+    --canvas: #3A3D43;
+    --canvas-ink: #EEEFF1;
+    --canvas-ok: #1E2D24;
+    --canvas-bad: #342326;
+    --gold: #FFC94A;
+    --gold-bg: #4A3A10;
+    --gold-hover: #5C4914;
+    --gold-text: #FFC94A;
+    --ink: #EEEFF1;
+    --muted: #9CA1AA;
+    --line: #EEEFF1;
+    --line-soft: #34373D;
+    --code-bg: #121417;
+    --sel: #2B3A80;
+    --accent: #7A90FF;
+    --accent-ink: #0B0C0E;
+    --grid-line: #0B0C0E;
+    --verdict-ink: #0B0C0E;
+    --ok: #52C986;   --ok-bg: #15291D;
+    --bad: #FF7085;  --bad-bg: #36161B;
+    --warn: #F2A85A; --warn-bg: #352613;
+    --check-a: #2B2E33; --check-b: #35383E;
+    --syn-kw: #8FA2FF; --syn-num: #FF9A8A; --syn-str: #7FD6A0;
+    --syn-com: #7C828C; --syn-def: #D1A6FF; --syn-builtin: #F0C27A;
+    color-scheme: dark;
+  }
+}
+
+/* ===================== בסיס ===================== */
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  font-family: var(--sans);
+  font-size: 17px;
+  line-height: 1.6;
+  color: var(--ink);
+  background: var(--paper);
+  -webkit-font-smoothing: antialiased;
+}
+code { font-family: var(--mono); font-size: .88em; }
+.goal code, .reqs code, .hint code, .status code:not(.err-code), .stage-meta code {
+  direction: ltr;
+  unicode-bidi: isolate;
+  background: var(--code-bg);
+  border: 1px solid var(--line-soft);
+  padding: 0 .32em;
+  white-space: nowrap;
+}
+button { font-family: inherit; }
+.dim { direction: ltr; unicode-bidi: isolate; }
+[hidden] { display: none !important; }
+
+/* ===================== סרגל עליון ===================== */
+.topbar {
+  height: var(--header-h);
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  padding: 0 28px;
+  background: var(--paper);
+  border-bottom: 2px solid var(--line);
+}
+.brand { display: flex; align-items: center; gap: 12px; }
+.logo {
+  display: grid;
+  grid-template-columns: repeat(2, 13px);
+  grid-template-rows: repeat(2, 13px);
+  gap: 2px;
+  background: #15171B;
+  border: 2px solid #15171B;
+  flex: none;
+}
+.logo i:nth-child(1) { background: #FF0000; }
+.logo i:nth-child(2) { background: #00FF00; }
+.logo i:nth-child(3) { background: #0000FF; }
+.logo i:nth-child(4) { background: #FFFFFF; }
+.brand-title { font-weight: 700; font-size: 19px; line-height: 1.2; }
+.brand-sub { font-size: 13.5px; color: var(--muted); line-height: 1.3; }
+
+.qnav { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 0; }
+.qgroup { display: flex; align-items: center; gap: 6px; }
+.qnav-label {
+  display: flex; align-items: center;
+  height: 40px;
+  margin-inline-start: 8px;
+  padding-inline-start: 14px;
+  border-inline-start: 2px solid var(--line-soft);
+  font-size: 14px; font-weight: 700;
+  color: var(--gold-text);
+}
+.qtab {
+  position: relative;
+  width: 40px; height: 40px;
+  border: 2px solid var(--line);
+  border-radius: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: 700 16px/1 var(--sans);
+  cursor: pointer;
+}
+.qtab:hover { background: var(--code-bg); }
+.qtab[aria-current="step"] { background: var(--ink); color: var(--paper); }
+.qtab.is-challenge { background: var(--gold-bg); }
+.qtab.is-challenge:hover { background: var(--gold-hover); }
+.qtab.is-challenge[aria-current="step"] { background: var(--ink); color: var(--gold); }
+.qtab.is-solved::after {
+  content: "";
+  position: absolute;
+  top: -6px; inset-inline-end: -6px;
+  width: 12px; height: 12px;
+  background: var(--ok);
+  border: 2px solid var(--paper);
+}
+.qtab:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+.engine {
+  margin-inline-start: auto;
+  display: flex; align-items: center; gap: 8px;
+  font-size: 14px; color: var(--muted);
+  white-space: nowrap;
+}
+.engine-dot { width: 10px; height: 10px; background: var(--muted); flex: none; }
+.engine[data-state="loading"] .engine-dot { background: var(--warn); animation: blink 1s steps(2, jump-none) infinite; }
+.engine[data-state="ready"] .engine-dot { background: var(--ok); }
+.engine[data-state="error"] .engine-dot { background: var(--bad); }
+.engine[data-state="error"] { color: var(--bad); }
+@keyframes blink { 50% { opacity: .2; } }
+
+/* ===================== פריסה ===================== */
+/* צד ימין: השאלה והקוד. צד שמאל: התמונות */
+.workspace { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.task { background: var(--paper); border-inline-end: 2px solid var(--line); }
+.stage { background: var(--canvas); color: var(--canvas-ink); transition: background-color .45s ease; }
+.stage[data-verdict="ok"]  { background: var(--canvas-ok); }
+.stage[data-verdict="bad"] { background: var(--canvas-bad); }
+/* הודעה אחרי 5 השאלות הראשונות */
+.milestone {
+  width: min(460px, calc(100vw - 32px));
+  padding: 28px 32px 30px;
+  border: 2px solid var(--line);
+  background: var(--paper);
+  color: var(--ink);
+  text-align: center;
+}
+.milestone::backdrop { background: rgba(21, 23, 27, .5); }
+.ms-track { display: flex; justify-content: center; gap: 6px; }
+.ms-track i { width: 22px; height: 22px; border: 2px solid var(--line); background: var(--ok); }
+.ms-track i.is-challenge { background: var(--gold-bg); }
+.ms-track i.is-gap { width: 10px; border: 0; background: none; }
+.milestone h2 { margin: 18px 0 2px; font-size: 32px; line-height: 1.2; }
+.milestone p { margin: 0 0 22px; font-size: 19px; }
+.ms-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 10px; }
+
+/* מסך הסיום */
+.finale {
+  position: fixed; inset: 0;
+  width: 100vw; height: 100vh; height: 100dvh;
+  max-width: none; max-height: none;
+  margin: 0; padding: 0; border: 0;
+  background: var(--canvas-ok);
+  color: var(--ink);
+}
+.finale::backdrop { background: var(--canvas-ok); }
+.finale-inner {
+  min-height: 100%;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 22px;
+  padding: 40px 20px;
+  text-align: center;
+}
+.trophy { display: grid; grid-template-columns: repeat(13, minmax(0, 1fr)); gap: 3px; width: min(280px, 64vw); }
+.trophy i { display: block; aspect-ratio: 1; }
+.trophy i.on { animation: px-in .22s ease-out both; }
+.finale h2 { margin: 8px 0 0; font-size: clamp(34px, 5.5vw, 60px); line-height: 1.1; font-weight: 700; }
+.finale p { margin: 0 0 8px; font-size: 19px; color: var(--muted); }
+
+.confetti { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 50; }
+.stage-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 32px 32px 56px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 40px 28px;
+  align-items: start;
+}
+/* כשיש מקום, התמונה הנתונה והתמונה שלכם עומדות זו לצד זו */
+.stage-inner.is-split { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.stage-block { min-width: 0; }
+.stage-frame { width: max-content; max-width: 100%; margin-inline: auto; }
+.stage-head {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 16px;
+  margin-bottom: 12px;
+}
+.stage-head h2 { margin: 0; font-size: 20px; font-weight: 700; line-height: 1.3; }
+.stage-meta { font-size: 15px; }
+.stage-meta code { background: var(--paper); border-color: var(--line); color: var(--ink); }
+
+@media (min-width: 981px) {
+  body { height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+  .workspace { flex: 1; min-height: 0; }
+  .stage, .task { overflow-y: auto; min-height: 0; }
+}
+
+/* ===================== תצוגת פיקסלים ===================== */
+.pixel-view {
+  width: max-content; max-width: 100%;
+  margin: 0 auto;
+  display: flex; flex-direction: column; align-items: center;
+}
+.px-grid {
+  position: relative;
+  z-index: 1;
+  align-self: stretch;
+  display: grid;
+  gap: 2px;
+  max-width: 100%;
+  background: var(--grid-line);
+  border: 2px solid var(--grid-line);
+}
+.px { position: relative; min-width: 0; }
+.px.is-active { box-shadow: inset 0 0 0 3px currentColor; }
+.px-missing {
+  background: repeating-linear-gradient(45deg, #E6E8EB 0 6px, #C9CCD2 6px 12px);
+  color: #15171B;
+}
+.px-diff::after {
+  content: "✕";
+  position: absolute; top: 4px; right: 4px;
+  width: 20px; height: 20px;
+  display: grid; place-items: center;
+  background: #FFFFFF;
+  color: #C0102C;
+  border: 2px solid #15171B;
+  font: 700 11px/1 var(--sans);
+}
+.px-reveal { animation: px-in .2s ease-out both; }
+@keyframes px-in { from { opacity: 0; transform: scale(.55); } to { opacity: 1; transform: none; } }
+
+.px-empty {
+  width: var(--view-w, 260px);
+  max-width: 100%;
+  display: flex; align-items: center; justify-content: center;
+  padding: 12px;
+  border: 2px dashed var(--canvas-ink);
+  background-color: var(--check-a);
+  background-image: conic-gradient(var(--check-b) 25%, var(--check-a) 0 50%, var(--check-b) 0 75%, var(--check-a) 0);
+  background-size: 24px 24px;
+}
+.px-empty p {
+  margin: 0;
+  padding: 6px 10px;
+  text-align: center;
+  font-size: 14px;
+  line-height: 1.45;
+  background: var(--paper);
+  color: var(--ink);
+  border: 2px solid var(--line);
+}
+
+/* הרשימה בפייתון, מחוברת לתחתית התמונה */
+.list-code {
+  align-self: stretch;
+  margin: -2px 0 0;
+  padding: 12px 14px;
+  overflow-x: auto;
+  white-space: pre;
+  text-align: left;
+  font: 500 13px/1.75 var(--mono);
+  background: var(--paper);
+  color: var(--ink);
+  border: 2px solid var(--grid-line);
+}
+/* התמונה שלכם לפחות ברוחב התמונה הנתונה, כדי שיהיה קל להשוות */
+#result-view .list-code { min-width: var(--view-w, 0px); }
+.tok-name { font-weight: 600; }
+.tok { padding: 1px 0; }
+.tok-diff { color: var(--bad); font-weight: 600; }
+.tok-bad { text-decoration: underline wavy var(--bad); text-underline-offset: 3px; }
+.tok.is-active { background: var(--accent); color: var(--accent-ink); }
+
+.hint summary {
+  cursor: pointer;
+  list-style: none;
+  font-weight: 700;
+  font-size: 15px;
+  display: inline-flex; align-items: center; gap: 8px;
+}
+.hint summary::-webkit-details-marker { display: none; }
+.hint summary::before {
+  content: "+";
+  display: inline-grid; place-items: center;
+  width: 20px; height: 20px;
+  border: 2px solid currentColor;
+  font: 700 14px/1 var(--mono);
+}
+.hint[open] summary::before { content: "−"; }
+.hint summary:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+
+/* ===================== חלונית המשימה ===================== */
+.task { background: var(--paper); }
+.task-inner { max-width: 700px; margin: 0 auto; padding: 32px 40px 40px; }
+.task h1 { margin: 0 0 14px; font-size: clamp(28px, 2.5vw, 36px); line-height: 1.15; font-weight: 700; letter-spacing: -.01em; }
+.goal p { margin: 0 0 10px; max-width: 62ch; }
+.hint { margin-top: 16px; }
+.hint-body { margin-top: 8px; padding: 10px 14px; background: var(--code-bg); border-inline-start: 4px solid var(--accent); font-size: 16px; }
+
+.editor-frame { border: 2px solid var(--line); margin-top: 18px; }
+.editor-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 7px 12px;
+  background: var(--ink); color: var(--paper);
+  font-size: 14px; font-weight: 500;
+}
+#editor .CodeMirror {
+  height: auto;
+  font-family: var(--mono);
+  font-size: 15.5px;
+  line-height: 1.65;
+  background: var(--code-bg);
+  color: var(--ink);
+}
+#editor .CodeMirror-scroll { min-height: 240px; max-height: 460px; }
+#editor .CodeMirror-lines { padding: 10px 0; }
+#editor .CodeMirror-gutters { background: var(--code-bg); border-right: 2px solid var(--line-soft); }
+#editor .CodeMirror-linenumber { color: var(--muted); padding: 0 8px 0 6px; }
+#editor .CodeMirror-cursor { border-left: 2px solid var(--ink); }
+#editor .CodeMirror-selected, #editor .CodeMirror-focused .CodeMirror-selected { background: var(--sel); }
+#editor .CodeMirror-matchingbracket { color: inherit !important; background: var(--sel); }
+#editor .cm-error-line { background: var(--bad-bg); }
+#editor .cm-s-default .cm-keyword { color: var(--syn-kw); font-weight: 600; }
+#editor .cm-s-default .cm-number { color: var(--syn-num); }
+#editor .cm-s-default .cm-string { color: var(--syn-str); }
+#editor .cm-s-default .cm-comment { color: var(--syn-com); font-style: normal; }
+#editor .cm-s-default .cm-def { color: var(--syn-def); }
+#editor .cm-s-default .cm-builtin { color: var(--syn-builtin); }
+#editor .cm-s-default .cm-variable,
+#editor .cm-s-default .cm-variable-2,
+#editor .cm-s-default .cm-property,
+#editor .cm-s-default .cm-operator,
+#editor .cm-s-default .cm-meta { color: var(--ink); }
+.editor-fallback {
+  display: block; width: 100%; min-height: 240px;
+  padding: 12px 14px;
+  border: 0; resize: vertical;
+  font: 15.5px/1.65 var(--mono);
+  background: var(--code-bg); color: var(--ink);
+  direction: ltr; text-align: left; tab-size: 4;
+}
+.editor-fallback:focus { outline: 3px solid var(--accent); outline-offset: -3px; }
+
+.actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+  min-height: 48px;
+  padding: 10px 20px;
+  border: 2px solid var(--line);
+  border-radius: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: 700 16px/1 var(--sans);
+  cursor: pointer;
+}
+.btn:hover { background: var(--code-bg); }
+.btn:active { transform: translateY(1px); }
+.btn:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.btn[disabled] { opacity: .4; cursor: not-allowed; transform: none; }
+.btn-primary { background: var(--ink); color: var(--paper); }
+.btn-primary:hover { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn-run { min-width: 150px; }
+.btn-run.is-running { background: var(--paper); color: var(--ink); border-color: var(--line); }
+.btn-run.is-running:hover { background: var(--code-bg); color: var(--ink); }
+.btn.is-armed { border-color: var(--bad); color: var(--bad); }
+.ico { width: 14px; height: 14px; fill: currentColor; flex: none; }
+
+.status { margin-top: 16px; }
+.status:empty { display: none; }
+.status-box { display: grid; grid-template-columns: auto minmax(0, 1fr); border: 2px solid var(--kc); background: var(--kbg); }
+.status-box[data-kind="ok"]   { --kc: var(--ok);   --kbg: var(--ok-bg); }
+.status-box[data-kind="bad"]  { --kc: var(--bad);  --kbg: var(--bad-bg); }
+.status-box[data-kind="warn"] { --kc: var(--warn); --kbg: var(--warn-bg); }
+.status-box[data-kind="info"],
+.status-box[data-kind="busy"] { --kc: var(--ink);  --kbg: var(--code-bg); }
+.verdict { padding: 10px 14px; background: var(--kc); color: var(--verdict-ink); font-weight: 700; font-size: 16px; line-height: 1.5; }
+.status-box[data-kind="info"] .verdict, .status-box[data-kind="busy"] .verdict { color: var(--paper); }
+.status-body { padding: 10px 14px; font-size: 16px; line-height: 1.55; }
+.status-body > p { margin: 0 0 6px; }
+.status-body > :last-child { margin-bottom: 0; }
+.status-body ul { margin: 0 0 6px; padding-inline-start: 20px; }
+.err-code {
+  display: block;
+  margin: 6px 0 8px;
+  padding: 6px 10px;
+  direction: ltr; text-align: left;
+  white-space: pre-wrap; word-break: break-word;
+  font-size: 14px;
+  background: var(--paper);
+  border: 1px solid var(--line-soft);
+}
+.status-body .btn { margin-top: 8px; min-height: 42px; padding: 8px 16px; font-size: 15px; }
+
+
+.pager { display: flex; justify-content: space-between; gap: 12px; margin-top: 32px; padding-top: 20px; border-top: 2px solid var(--line-soft); }
+
+/* ===================== מסכים קטנים ===================== */
+@media (max-width: 980px) {
+  .workspace { grid-template-columns: minmax(0, 1fr); }
+  .task { border-inline-end: 0; }
+  .stage { order: -1; border-bottom: 2px solid var(--line); }
+  .topbar { height: auto; flex-wrap: wrap; gap: 12px 24px; padding: 12px 18px; }
+  .stage-inner { padding: 24px 18px 36px; }
+  .task-inner { padding: 24px 18px 36px; }
+}
+@media (max-width: 560px) {
+  .brand-sub { display: none; }
+  .qnav-label { margin-inline-start: 0; padding-inline-start: 0; border-inline-start: 0; }
+  .qnav .qgroup + .qgroup { margin-inline-start: 0; }
+  .engine { margin-inline-start: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .stage { transition: none; }
+  .trophy i.on { animation: none !important; }
+  .px-reveal, .engine-dot { animation: none !important; }
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="logo" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+    <div>
+      <div class="brand-title">פיקסל אחר פיקסל</div>
+      <div class="brand-sub">תמונות כרשימה של טאפלים בפייתון</div>
+    </div>
+  </div>
+  <nav class="qnav" id="qnav" aria-label="שאלות"></nav>
+  <div class="engine" id="engine" data-state="loading" role="status">
+    <span class="engine-dot" aria-hidden="true"></span>
+    <span id="engine-text">טוען את פייתון…</span>
+  </div>
+</header>
+
+<main class="workspace">
+  <!-- צד ימין: השאלה, עורך הקוד וההרצה -->
+  <section class="task" aria-label="השאלה">
+    <div class="task-inner">
+      <h1 id="q-title"></h1>
+      <div class="goal" id="q-goal"></div>
+
+      <div class="editor-frame">
+        <div class="editor-bar"><span>הקוד שלכם</span></div>
+        <div id="editor" dir="ltr"></div>
+      </div>
+
+      <div class="actions">
+        <button type="button" class="btn btn-primary btn-run" id="run-btn">
+          <svg class="ico" id="run-ico" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 1 L13 7 L2 13 Z"/></svg>
+          <span id="run-label">הרצה</span>
+        </button>
+        <button type="button" class="btn" id="reset-btn">איפוס הקוד</button>
+      </div>
+
+      <details class="hint" id="q-hint">
+        <summary>רמז</summary>
+        <div class="hint-body" id="q-hint-body"></div>
+      </details>
+
+      <div class="status" id="status" aria-live="polite"></div>
+
+      <nav class="pager" aria-label="מעבר בין שאלות">
+        <button type="button" class="btn" id="prev-btn">השאלה הקודמת</button>
+        <button type="button" class="btn" id="next-btn">השאלה הבאה</button>
+      </nav>
+    </div>
+  </section>
+
+  <!-- צד שמאל: התמונות -->
+  <section class="stage" aria-label="תמונות">
+    <div class="stage-inner" id="stage-inner">
+      <div class="stage-block" id="given-block">
+        <div class="stage-frame">
+          <div class="stage-head">
+            <h2>התמונה הנתונה</h2>
+            <span class="stage-meta" id="given-meta"></span>
+          </div>
+          <div id="given-view"></div>
+        </div>
+      </div>
+      <div class="stage-block" id="result-block">
+        <div class="stage-frame">
+          <div class="stage-head">
+            <h2>התמונה שלכם</h2>
+            <span class="stage-meta" id="result-meta"></span>
+          </div>
+          <div id="result-view"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<dialog class="milestone" id="milestone" aria-labelledby="milestone-title">
+  <div class="ms-track" id="ms-track" aria-hidden="true"></div>
+  <h2 id="milestone-title">כל הכבוד!</h2>
+  <p>המשיכו לתרגילי האתגר</p>
+  <div class="ms-actions">
+    <button type="button" class="btn btn-primary" id="ms-go">לתרגילי האתגר</button>
+    <button type="button" class="btn" id="ms-close">סגירה</button>
+  </div>
+</dialog>
+
+<dialog class="finale" id="finale" aria-labelledby="finale-title">
+  <div class="finale-inner">
+    <div class="trophy" id="trophy" dir="ltr" aria-hidden="true"></div>
+    <h2 id="finale-title">כל הכבוד! אלופי הפיקסלים</h2>
+    <p>פתרתם את כל השאלות, כולל תרגילי האתגר.</p>
+    <button type="button" class="btn btn-primary" id="finale-close">חזרה לשאלות</button>
+  </div>
+</dialog>
+
+<!-- ============================================================
+     קוד הפייתון שמריץ את הקוד של התלמידים ובודק אותו.
+     רץ בתוך Pyodide (פייתון בדפדפן), בתוך Web Worker.
+     ============================================================ -->
+<script type="text/plain" id="py-runner">
+import ast
+import contextlib
+import io
+import json
+import re
+import sys
+import traceback
+import types
+
+_STUDENT_FILE = "student.py"
+_MAX_OUTPUT = 20000
+_shown_images = []
+
+
+class _CappedOutput(io.StringIO):
+    def write(self, s):
+        if self.tell() < _MAX_OUTPUT:
+            return super().write(s)
+        return len(s)
+
+
+def _clamp(v):
+    return max(0, min(255, int(v)))
+
+
+def show_image(pixel_list, image_size=None, display_size=None):
+    """תואמת לפונקציית העזר מהמחברת: מציגה רשימת פיקסלים כתמונה בחלון הפלט."""
+    data = list(pixel_list)
+    if image_size is None:
+        side = int(round(len(data) ** 0.5))
+        if side * side != len(data):
+            raise ValueError("show_image: cannot guess the image size, pass it too, e.g. show_image(pixels, (4, 4))")
+        image_size = (side, side)
+    w, h = int(image_size[0]), int(image_size[1])
+    out = []
+    for p in data[: w * h]:
+        try:
+            r, g, b = p
+            out.append([_clamp(r), _clamp(g), _clamp(b)])
+        except Exception:
+            out.append(None)
+    out.extend([None] * (w * h - len(out)))
+    _shown_images.append({"w": w, "h": h, "pixels": out, "label": "show_image"})
+
+
+def display(*objs, **kwargs):
+    for obj in objs:
+        if all(hasattr(obj, a) for a in ("getdata", "size", "convert")):
+            img = obj.convert("RGB")
+            if img.size[0] * img.size[1] > 250000:
+                img = img.copy()
+                img.thumbnail((500, 500))
+            w, h = img.size
+            _shown_images.append({"w": w, "h": h, "pixels": [list(p) for p in img.getdata()], "label": "display"})
+        else:
+            print(repr(obj))
+
+
+# מודול מדומה, כדי ש- from IPython.display import display יעבוד כמו במחברת
+_ipython = types.ModuleType("IPython")
+_ipython_display = types.ModuleType("IPython.display")
+_ipython_display.display = display
+_ipython.display = _ipython_display
+sys.modules["IPython"] = _ipython
+sys.modules["IPython.display"] = _ipython_display
+
+
+def _no_input(*args, **kwargs):
+    raise RuntimeError("input() is not available here. Write the values directly in the code.")
+
+
+def _namespace(p):
+    return {
+        "__name__": "__main__",
+        "pixels": [tuple(px) for px in p["pixels"]],
+        "WIDTH": p["width"],
+        "HEIGHT": p["height"],
+        "show_image": show_image,
+        "display": display,
+        "input": _no_input,
+    }
+
+
+def _hint(name, message):
+    m = (message or "").lower()
+    if name in ("IndentationError", "TabError"):
+        return "בעיית הזחה. שורות שנמצאות בתוך לולאה צריכות להיות מוזחות פנימה (4 רווחים), וכל השורות באותו בלוק צריכות אותה הזחה."
+    if name == "SyntaxError":
+        if "expected ':'" in m:
+            return "חסרות נקודתיים `:` בסוף השורה, למשל בסוף שורת ה-`for`."
+        if "never closed" in m or "unmatched" in m or "does not match" in m:
+            return "יש סוגר שלא נסגר, או סוגר מיותר. בדקו שלכל `(` יש `)` מתאים."
+        if "forgot a comma" in m:
+            return "נראה שחסר פסיק, למשל בין הערכים בתוך הטאפל."
+        if "unterminated string" in m:
+            return "יש מחרוזת שלא נסגרה במירכאות."
+        if "leading zeros" in m:
+            return "אי אפשר לכתוב מספר שמתחיל ב-0, כמו `05`. כתבו `5`."
+        return "שגיאת תחביר. בדקו סוגריים, פסיקים ונקודתיים בשורה המסומנת או בשורה שלפניה."
+    if name == "NameError":
+        found = re.search(r"name '([^']+)'", message or "")
+        n = found.group(1) if found else "?"
+        if n == "_":
+            return "בקוד עדיין יש `_`. במקום כל `_` כתבו את הערך המתאים."
+        return f"השם `{n}` לא מוגדר. בדקו שאין שגיאת כתיב, ושהמשתנה הוגדר לפני השימוש בו."
+    if name == "IndexError":
+        return "ניסיתם לגשת למקום שלא קיים ברשימה. האינדקס הראשון הוא `0`, והאחרון הוא `len(pixels) - 1`."
+    if name == "TypeError":
+        if "does not support item assignment" in m and "tuple" in m:
+            return "אי אפשר לשנות ערך בתוך טאפל קיים. צרו טאפל חדש במקומו, למשל `(r, g, 0)`."
+        if "append" in m and "argument" in m:
+            return "הפעולה `append` מקבלת ערך אחד בלבד. כדי להוסיף פיקסל, העבירו טאפל שלם, למשל `append((r, g, 0))`."
+        if "cannot unpack" in m:
+            return "ניסיתם לפרק לכמה משתנים ערך שאינו טאפל. בדקו על מה עוברת הלולאה."
+        return "פעולה שלא מתאימה לסוג הנתונים. בדקו איזה סוג יש לכל משתנה בשורה המסומנת."
+    if name == "ValueError" and "unpack" in m:
+        return "מספר המשתנים לא מתאים למספר הערכים. בכל פיקסל יש בדיוק 3 ערכים: `r, g, b`."
+    if name == "AttributeError":
+        return "לסוג הנתונים הזה אין את הפעולה שניסיתם להפעיל. בדקו את האיות, למשל `append`."
+    return ""
+
+
+def _error_info(e):
+    line = None
+    for frame in traceback.extract_tb(e.__traceback__):
+        if frame.filename == _STUDENT_FILE:
+            line = frame.lineno
+    name = type(e).__name__
+    message = str(e)
+    return {"type": name, "message": message, "line": line, "hint": _hint(name, message)}
+
+
+def _syntax_info(e):
+    name = type(e).__name__
+    return {"type": name, "message": e.msg, "line": e.lineno, "hint": _hint(name, e.msg)}
+
+
+_LOOP_NODES = (ast.For, ast.While, ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)
+
+
+def _check_rules(tree, rules):
+    nodes = list(ast.walk(tree))
+    found = []
+    if rules.get("noLoops") and any(isinstance(n, _LOOP_NODES) for n in nodes):
+        found.append("בשאלה הזו צריך לשנות כל פיקסל ישירות לפי האינדקס שלו, בלי לולאה.")
+    if rules.get("requireFor") and not any(isinstance(n, ast.For) for n in nodes):
+        found.append("בשאלה הזו צריך להשתמש בלולאת `for`.")
+    return found
+
+
+def _pick(ns, names):
+    found = [(n, ns[n]) for n in names if n in ns]
+    if not found:
+        return None, None
+    for n, v in found:
+        if isinstance(v, (list, tuple)) and len(v) > 0:
+            return n, v
+    return found[0]
+
+
+def _short_repr(obj):
+    try:
+        text = repr(obj)
+    except Exception:
+        text = "?"
+    return text if len(text) <= 40 else text[:37] + "..."
+
+
+def _inspect(value, n, var):
+    if not isinstance(value, (list, tuple)):
+        return None, [f"`{var}` צריך להיות רשימה של פיקסלים, אבל הוא מסוג `{type(value).__name__}`."], {}, [], None
+    items = list(value)
+    render, notes, as_list = [], {}, []
+    for i, px in enumerate(items[:n]):
+        note = None
+        if not isinstance(px, (tuple, list)):
+            note = f"האיבר הוא `{type(px).__name__}` ולא טאפל של שלושה צבעים."
+        elif len(px) != 3:
+            note = f"בטאפל יש {len(px)} ערכים במקום 3."
+        elif not all(isinstance(c, int) and not isinstance(c, bool) for c in px):
+            if any(isinstance(c, float) for c in px):
+                note = "כל ערך בטאפל צריך להיות מספר שלם, אבל יש כאן מספר עשרוני. חילוק רגיל `/` נותן מספר עשרוני, וחילוק שלמים `//` נותן מספר שלם."
+            else:
+                note = "כל ערך בטאפל צריך להיות מספר שלם."
+        elif not all(0 <= c <= 255 for c in px):
+            note = "כל ערך בטאפל צריך להיות בין 0 ל-255."
+        if note:
+            render.append(None)
+            notes[str(i)] = note
+        else:
+            render.append([int(c) for c in px])
+            if isinstance(px, list):
+                as_list.append(i)
+    render.extend([None] * (n - len(render)))
+    problems = []
+    if len(items) != n:
+        problems.append(f"ברשימה `{var}` יש {len(items)} פיקסלים, אבל בתמונה צריכים להיות {n}.")
+    if notes:
+        problems.append(f"{len(notes)} מהפיקסלים אינם טאפל תקין מהצורה `(R, G, B)`. הם מסומנים באדום ברשימה.")
+        problems.extend(list(dict.fromkeys(notes.values()))[:2])
+    reprs = [_short_repr(px) for px in items[:1024]]
+    return render, problems, notes, as_list, reprs
+
+
+def _run(p):
+    n = p["width"] * p["height"]
+    result_vars = p["resultVars"]
+    out = {"status": "", "stdout": "", "images": [], "problems": [], "cellNotes": {},
+           "diff": [], "var": result_vars[0], "render": None, "violations": []}
+
+    try:
+        tree = ast.parse(p["code"], _STUDENT_FILE)
+    except SyntaxError as e:
+        out["status"] = "syntax"
+        out["error"] = _syntax_info(e)
+        return out
+
+    expected = None
+    if p.get("solution"):
+        try:
+            sol_ns = _namespace(p)
+            with contextlib.redirect_stdout(io.StringIO()):
+                exec(compile(p["solution"], "solution.py", "exec"), sol_ns)
+            _, sol_value = _pick(sol_ns, result_vars)
+            expected = [tuple(px) for px in sol_value]
+        except Exception as e:
+            out["solutionError"] = f"{type(e).__name__}: {e}"
+    _shown_images.clear()
+
+    ns = _namespace(p)
+    buffer = _CappedOutput()
+    try:
+        with contextlib.redirect_stdout(buffer):
+            exec(compile(tree, _STUDENT_FILE, "exec"), ns)
+    except (Exception, SystemExit) as e:
+        out["stdout"] = buffer.getvalue()
+        out["images"] = list(_shown_images)
+        out["status"] = "error"
+        out["error"] = _error_info(e)
+        return out
+    out["stdout"] = buffer.getvalue()
+    out["images"] = list(_shown_images)
+
+    var, value = _pick(ns, result_vars)
+    if var is None:
+        out["status"] = "missing"
+        return out
+    out["var"] = var
+    render, problems, notes, as_list, reprs = _inspect(value, n, var)
+    out["render"], out["problems"], out["cellNotes"], out["reprs"] = render, problems, notes, reprs
+    if render is None:
+        out["status"] = "invalid"
+        return out
+    out["violations"] = _check_rules(tree, p.get("rules") or {})
+    if expected is None:
+        out["status"] = "ran"
+        return out
+
+    values = [tuple(px) if isinstance(px, (list, tuple)) else px for px in value]
+    diff = [i for i in range(n) if i >= len(values) or i >= len(expected) or values[i] != expected[i]]
+    out["diff"] = diff
+    if diff or len(values) != len(expected):
+        out["status"] = "wrong"
+        original = [tuple(px) for px in p["pixels"]]
+        if values == original and expected != original:
+            out["unchanged"] = True
+        return out
+    if as_list:
+        out["status"] = "almost"
+        return out
+    if out["violations"]:
+        out["status"] = "rule"
+        return out
+    out["status"] = "correct"
+    return out
+
+
+def _run_task(payload_json):
+    p = json.loads(payload_json)
+    _shown_images.clear()
+    try:
+        result = _run(p)
+    except Exception as e:
+        result = {"status": "internal", "message": f"{type(e).__name__}: {e}"}
+    return json.dumps(result, ensure_ascii=False)
+</script>
+
+<!-- ============================================================
+     ה-Worker שטוען את Pyodide. הרצה בתוכו מאפשרת לעצור לולאה אינסופית.
+     ============================================================ -->
+<script type="text/plain" id="worker-src">
+let pyodide = null;
+let runTask = null;
+
+self.onmessage = async (event) => {
+  const msg = event.data;
+
+  if (msg.type === "init") {
+    try {
+      importScripts(msg.url + "pyodide.js");
+      pyodide = await loadPyodide({ indexURL: msg.url });
+      pyodide.runPython(msg.runner);
+      runTask = pyodide.globals.get("_run_task");
+      self.postMessage({ type: "ready" });
+    } catch (err) {
+      self.postMessage({ type: "fatal", message: String((err && err.message) || err) });
+    }
+    return;
+  }
+
+  if (msg.type === "run") {
+    const { runId, payload } = msg;
+    try {
+      const source = payload.code + "\n" + (payload.solution || "");
+      const packages = [];
+      if (/^\s*(?:from|import)\s+PIL\b/m.test(source)) packages.push("pillow");
+      if (/^\s*(?:from|import)\s+numpy\b/m.test(source)) packages.push("numpy");
+      if (packages.length) {
+        self.postMessage({ type: "packages", runId });
+        await pyodide.loadPackage(packages);
+      }
+      self.postMessage({ type: "exec-start", runId });
+      const json = runTask(JSON.stringify(payload));
+      self.postMessage({ type: "result", runId, data: JSON.parse(json) });
+    } catch (err) {
+      self.postMessage({ type: "result", runId, data: { status: "internal", message: String((err && err.message) || err) } });
+    }
+  }
+};
+</script>
+
+<!-- ============================================================
+     מנוע גיבוי: MicroPython. גרסה קטנה וחסכונית של פייתון, שנטענת רק אם
+     הדפדפן לא מצליח לטעון את Pyodide (למשל בדפדפן של 32 ביט).
+     אין בה מודול ast, ולכן בדיקת הדרישות (למשל "חובה for") נעשית ב-JavaScript.
+     ============================================================ -->
+<script type="text/plain" id="py-runner-micro">
+import io
+import json
+import sys
+
+_STUDENT_FILE = "student.py"
+
+
+def show_image(*args, **kwargs):
+    pass
+
+
+def display(*args, **kwargs):
+    pass
+
+
+def _no_input(*args, **kwargs):
+    raise RuntimeError("input() is not available here. Write the values directly in the code.")
+
+
+def _namespace(p):
+    return {
+        "__name__": "__main__",
+        "pixels": [tuple(px) for px in p["pixels"]],
+        "WIDTH": p["width"],
+        "HEIGHT": p["height"],
+        "show_image": show_image,
+        "display": display,
+        "input": _no_input,
+    }
+
+
+def _quoted_name(message):
+    i = message.find("'")
+    j = message.find("'", i + 1)
+    if i >= 0 and j > i:
+        return message[i + 1:j]
+    return "?"
+
+
+def _indent(text):
+    return len(text) - len(text.lstrip())
+
+
+def _is_block_header(stripped):
+    word = stripped.replace(":", " ").split()[0] if stripped else ""
+    return word in ("for", "if", "elif", "else", "while", "def")
+
+
+def _syntax_hint(code, line):
+    lines = code.split("\n")
+    for ln in (line, line - 1):
+        if 1 <= ln <= len(lines):
+            stripped = lines[ln - 1].strip()
+            if stripped and _is_block_header(stripped) and not stripped.endswith(":"):
+                return "חסרות נקודתיים `:` בסוף השורה, למשל בסוף שורת ה-`for`."
+    if 2 <= line <= len(lines):
+        prev = lines[line - 2]
+        if prev.strip().endswith(":") and _indent(lines[line - 1]) <= _indent(prev):
+            return "בעיית הזחה. השורות שבתוך לולאה או תנאי צריכות להיות מוזחות פנימה (4 רווחים)."
+    return "שגיאת תחביר. בדקו סוגריים, פסיקים ונקודתיים בשורה המסומנת או בשורה שלפניה."
+
+
+def _hint(name, message):
+    m = (message or "").lower()
+    if name == "NameError":
+        n = _quoted_name(message or "")
+        if n == "_":
+            return "בקוד עדיין יש `_`. במקום כל `_` כתבו את הערך המתאים."
+        return "השם `%s` לא מוגדר. בדקו שאין שגיאת כתיב, ושהמשתנה הוגדר לפני השימוש בו." % n
+    if name == "IndexError":
+        return "ניסיתם לגשת למקום שלא קיים ברשימה. האינדקס הראשון הוא `0`, והאחרון הוא `len(pixels) - 1`."
+    if name == "TypeError":
+        if "item assignment" in m and "tuple" in m:
+            return "אי אפשר לשנות ערך בתוך טאפל קיים. צרו טאפל חדש במקומו, למשל `(r, g, 0)`."
+        if "positional argument" in m:
+            return "מספר הערכים שהעברתם לפונקציה לא מתאים. למשל, `append` מקבלת ערך אחד בלבד, ולכן מעבירים לה טאפל שלם: `append((r, g, 0))`."
+        if "iterable" in m or "unpack" in m:
+            return "ניסיתם לעבור בלולאה או לפרק ערך שאינו רשימה או טאפל. בדקו על מה עוברת הלולאה."
+        return "פעולה שלא מתאימה לסוג הנתונים. בדקו איזה סוג יש לכל משתנה בשורה המסומנת."
+    if name == "ValueError" and "unpack" in m:
+        return "מספר המשתנים לא מתאים למספר הערכים. בכל פיקסל יש בדיוק 3 ערכים: `r, g, b`."
+    if name == "AttributeError":
+        return "לסוג הנתונים הזה אין את הפעולה שניסיתם להפעיל. בדקו את האיות, למשל `append`."
+    return ""
+
+
+def _error_info(e, code):
+    buf = io.StringIO()
+    sys.print_exception(e, buf)
+    line = None
+    key = 'File "%s", line ' % _STUDENT_FILE
+    for row in buf.getvalue().split("\n"):
+        i = row.find(key)
+        if i >= 0:
+            digits = ""
+            for ch in row[i + len(key):]:
+                if "0" <= ch <= "9":
+                    digits += ch
+                else:
+                    break
+            if digits:
+                line = int(digits)
+    name = type(e).__name__
+    message = str(e)
+    if name in ("SyntaxError", "IndentationError"):
+        hint = _syntax_hint(code, line or 0)
+    else:
+        hint = _hint(name, message)
+    return {"type": name, "message": message, "line": line, "hint": hint}
+
+
+def _pick(ns, names):
+    found = [(n, ns[n]) for n in names if n in ns]
+    if not found:
+        return None, None
+    for n, v in found:
+        if isinstance(v, (list, tuple)) and len(v) > 0:
+            return n, v
+    return found[0]
+
+
+def _short_repr(obj):
+    try:
+        text = repr(obj)
+    except Exception:
+        text = "?"
+    return text if len(text) <= 40 else text[:37] + "..."
+
+
+def _inspect(value, n, var):
+    if not isinstance(value, (list, tuple)):
+        return None, ["`%s` צריך להיות רשימה של פיקסלים, אבל הוא מסוג `%s`." % (var, type(value).__name__)], {}, [], None
+    items = list(value)
+    render, notes, as_list = [], {}, []
+    for i, px in enumerate(items[:n]):
+        note = None
+        if not isinstance(px, (tuple, list)):
+            note = "האיבר הוא `%s` ולא טאפל של שלושה צבעים." % type(px).__name__
+        elif len(px) != 3:
+            note = "בטאפל יש %d ערכים במקום 3." % len(px)
+        elif not all(isinstance(c, int) and not isinstance(c, bool) for c in px):
+            if any(isinstance(c, float) for c in px):
+                note = "כל ערך בטאפל צריך להיות מספר שלם, אבל יש כאן מספר עשרוני. חילוק רגיל `/` נותן מספר עשרוני, וחילוק שלמים `//` נותן מספר שלם."
+            else:
+                note = "כל ערך בטאפל צריך להיות מספר שלם."
+        elif not all(0 <= c <= 255 for c in px):
+            note = "כל ערך בטאפל צריך להיות בין 0 ל-255."
+        if note:
+            render.append(None)
+            notes[str(i)] = note
+        else:
+            render.append([int(c) for c in px])
+            if isinstance(px, list):
+                as_list.append(i)
+    while len(render) < n:
+        render.append(None)
+    problems = []
+    if len(items) != n:
+        problems.append("ברשימה `%s` יש %d פיקסלים, אבל בתמונה צריכים להיות %d." % (var, len(items), n))
+    if notes:
+        problems.append("%d מהפיקסלים אינם טאפל תקין מהצורה `(R, G, B)`. הם מסומנים באדום ברשימה." % len(notes))
+        unique = []
+        for text in notes.values():
+            if text not in unique:
+                unique.append(text)
+        problems.extend(unique[:2])
+    reprs = [_short_repr(px) for px in items[:1024]]
+    return render, problems, notes, as_list, reprs
+
+
+def _run(p):
+    n = p["width"] * p["height"]
+    result_vars = p["resultVars"]
+    out = {"status": "", "stdout": "", "images": [], "problems": [], "cellNotes": {},
+           "diff": [], "var": result_vars[0], "render": None, "violations": []}
+    code = p["code"]
+    try:
+        compiled = compile(code, _STUDENT_FILE, "exec")
+    except Exception as e:
+        out["status"] = "syntax"
+        out["error"] = _error_info(e, code)
+        return out
+
+    expected = None
+    if p.get("solution"):
+        try:
+            sol_ns = _namespace(p)
+            exec(compile(p["solution"], "solution.py", "exec"), sol_ns)
+            sol_value = _pick(sol_ns, result_vars)[1]
+            expected = [tuple(px) for px in sol_value]
+        except Exception as e:
+            out["solutionError"] = "%s: %s" % (type(e).__name__, e)
+
+    ns = _namespace(p)
+    try:
+        exec(compiled, ns)
+    except (Exception, SystemExit) as e:
+        out["status"] = "error"
+        out["error"] = _error_info(e, code)
+        return out
+
+    var, value = _pick(ns, result_vars)
+    if var is None:
+        out["status"] = "missing"
+        return out
+    out["var"] = var
+    render, problems, notes, as_list, reprs = _inspect(value, n, var)
+    out["render"], out["problems"], out["cellNotes"], out["reprs"] = render, problems, notes, reprs
+    if render is None:
+        out["status"] = "invalid"
+        return out
+    out["violations"] = list(p.get("violations") or [])
+    if expected is None:
+        out["status"] = "ran"
+        return out
+
+    values = [tuple(px) if isinstance(px, (list, tuple)) else px for px in value]
+    diff = [i for i in range(n) if i >= len(values) or i >= len(expected) or values[i] != expected[i]]
+    out["diff"] = diff
+    if diff or len(values) != len(expected):
+        out["status"] = "wrong"
+        original = [tuple(px) for px in p["pixels"]]
+        if values == original and expected != original:
+            out["unchanged"] = True
+        return out
+    if as_list:
+        out["status"] = "almost"
+        return out
+    if out["violations"]:
+        out["status"] = "rule"
+        return out
+    out["status"] = "correct"
+    return out
+
+
+def _run_task(payload_json):
+    p = json.loads(payload_json)
+    try:
+        result = _run(p)
+    except Exception as e:
+        result = {"status": "internal", "message": "%s: %s" % (type(e).__name__, e)}
+    return json.dumps(result)
+</script>
+
+<script type="text/plain" id="worker-micro-src">
+let mp = null;
+
+self.onmessage = async (event) => {
+  const msg = event.data;
+
+  if (msg.type === "init") {
+    try {
+      const { loadMicroPython } = await import(msg.url + "micropython.mjs");
+      mp = await loadMicroPython({
+        url: msg.url + "micropython.wasm",
+        heapsize: 16 * 1024 * 1024,
+        stdout: () => {},
+        stderr: () => {},
+      });
+      mp.runPython(msg.runner);
+      self.postMessage({ type: "ready" });
+    } catch (err) {
+      self.postMessage({ type: "fatal", message: String((err && err.message) || err) });
+    }
+    return;
+  }
+
+  if (msg.type === "run") {
+    const { runId, payload } = msg;
+    try {
+      self.postMessage({ type: "exec-start", runId });
+      mp.globals.set("_payload_json", JSON.stringify(payload));
+      mp.runPython("_result_json = _run_task(_payload_json)");
+      self.postMessage({ type: "result", runId, data: JSON.parse(mp.globals.get("_result_json")) });
+    } catch (err) {
+      self.postMessage({ type: "result", runId, data: { status: "internal", message: String((err && err.message) || err) } });
+    }
+  }
+};
+</script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/python/python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js"></script>
+
+<script>
+(() => {
+"use strict";
+
+/* ================================================================
+   הגדרות כלליות
+   ================================================================ */
+const PYODIDE_URL = "https://cdn.jsdelivr.net/pyodide/v0.27.7/full/";
+const MICROPYTHON_URL = "https://cdn.jsdelivr.net/npm/@micropython/micropython-webassembly-pyscript@1.27.0/";  // מנוע גיבוי
+const RUN_TIMEOUT_MS = 6000;               // אחרי כמה זמן לעצור קוד שלא מסתיים
+const STORAGE_KEY = "pixel-by-pixel:v2";   // שמירת הקוד וההתקדמות בדפדפן של התלמיד
+
+/* ================================================================
+   השאלות
+   ----------------------------------------------------------------
+   כדי להוסיף שאלה, העתיקו את אחד האובייקטים והוסיפו אותו לסוף הרשימה.
+   מספר השאלה נקבע לפי המקום שלה ברשימה.
+
+   id           מזהה ייחודי. הקוד וההתקדמות של התלמידים נשמרים לפיו,
+                לכן לא כדאי לשנות אותו אחרי שהאתר כבר בשימוש.
+   width,height גודל התמונה בפיקסלים: רוחב (פיקסלים בשורה) וגובה (מספר שורות).
+   pixels       התמונה הנתונה: רשימה של [R, G, B] לפי הסדר, שורה אחרי שורה.
+   goal         תיאור המשימה (HTML). קוד כותבים בתוך <code>...</code>,
+                ומידות כמו 3×2 בתוך <span class="dim">...</span>.
+   starter      הקוד שמופיע בעורך בהתחלה.
+   solution     פתרון נכון. האתר מריץ אותו ומשווה את התוצאה שלו לתוצאה של התלמיד,
+                כך שאין צורך לכתוב את התמונה המבוקשת ידנית.
+   resultVars   שם המשתנה שבו תהיה התמונה החדשה. אפשר לתת כמה שמות חלופיים.
+   rules        noLoops: true    אסור להשתמש בלולאה.
+                requireFor: true חובה להשתמש בלולאת for.
+   hint         רמז (HTML). אפשר להשמיט.
+   challenge    true לשאלת אתגר: מסומנת בזהב בסרגל העליון, והכותרת שלה "שאלה N: אתגר".
+
+   בקוד של התלמידים כבר מוגדרים: pixels, WIDTH, HEIGHT,
+   ו-show_image(pixel_list, (w, h)) להצגת תמונה נוספת בחלון הפלט.
+   גם from PIL import Image ו-from IPython.display import display עובדים.
+   ================================================================ */
+const QUESTIONS = [
+  {
+    id: "q1-black-corners",
+    width: 2,
+    height: 2,
+    pixels: [
+      [255, 0, 0], [0, 255, 0],
+      [0, 0, 255], [255, 255, 255],
+    ],
+    goal: `
+      <p>נתונה תמונה בגודל <span class="dim">2×2</span> פיקסלים, השמורה ברשימה <code>pixels</code>.</p>
+      <p>נתונה שורת קוד שהופכת את הפיקסל הראשון בתמונה לשחור, הריצו אותה. הוסיפו שורת קוד נוספת שהופכת את הפיקסל האחרון לשחור.</p>`,
+    starter: "pixels[0] = (0,0,0)\n",
+    solution: "pixels[0] = (0,0,0)\npixels[3] = (0,0,0)\n",
+    resultVars: ["pixels"],
+    rules: {},
+    hint: `ברשימה של 4 פיקסלים האינדקסים הם <code>0</code>, <code>1</code>, <code>2</code>, <code>3</code>. מה האינדקס של הפיקסל האחרון?`,
+  },
+  {
+    id: "q2-all-red",
+    width: 3,
+    height: 2,
+    pixels: [
+      [100, 150, 200], [0, 255, 255],  [255, 0, 128],
+      [80, 180, 240],  [50, 200, 100], [220, 220, 220],
+    ],
+    goal: `
+      <p>נתונה תמונה בגודל <span class="dim">3×2</span> פיקסלים, השמורה ברשימה <code>pixels</code>.</p>
+      <p>השלימו את הקוד כדי שכל פיקסל ברשימה החדשה <code>red_pixels</code> יהיה אדום <code>(255, 0, 0)</code>.</p>`,
+    starter: "red_pixels = []\nfor r,g,b in pixels:\n    red_pixels.append((_, _, _))\n",
+    solution: "red_pixels = []\nfor r, g, b in pixels:\n    red_pixels.append((255, 0, 0))\n",
+    resultVars: ["red_pixels"],
+    rules: { requireFor: true },
+    hint: `כל <code>_</code> הוא מקום לערך אחד: R, אחר כך G ואחר כך B. באדום מלא R הוא 255, ו-G ו-B הם 0.`,
+  },
+  {
+    id: "q3-no-blue",
+    width: 3,
+    height: 3,
+    pixels: [
+      [255, 255, 255], [100, 150, 200], [0, 0, 255],
+      [50, 200, 100],  [255, 0, 128],   [0, 255, 255],
+      [120, 80, 220],  [200, 200, 200], [10, 20, 30],
+    ],
+    goal: `
+      <p>נתונה תמונה בגודל <span class="dim">3×3</span> פיקסלים, השמורה ברשימה <code>pixels</code>.</p>
+      <p>צרו תמונה חדשה ללא ערוץ הצבע הכחול. כתבו לולאת <code>for</code> שעוברת על הרשימה <code>pixels</code>, ובונה רשימה חדשה בשם <code>no_blue</code>.</p>
+      <p>ברשימה החדשה, הערכים R ו-G יישארו כפי שהיו במקור, אך הערך B יהפוך ל-0.</p>
+      <p>היעזרו בקוד שכתבתם בשאלה הקודמת.</p>`,
+    starter: "no_blue = []\n",
+    solution: "no_blue = []\nfor r, g, b in pixels:\n    new_pixel = (r, g, 0)\n    no_blue.append(new_pixel)\n",
+    resultVars: ["no_blue"],
+    rules: { requireFor: true },
+    hint: `אפשר לפרק כל פיקסל לשלושה משתנים כבר בשורת הלולאה: <code>for r, g, b in pixels:</code>. בתוך הלולאה צרו טאפל חדש והוסיפו אותו לרשימה עם <code>append</code>.`,
+  },
+  {
+    id: "q4-turquoise",
+    width: 4,
+    height: 4,
+    pixels: [
+      [255, 255, 255], [0, 0, 0],       [255, 255, 255], [0, 0, 0],
+      [0, 0, 0],       [255, 255, 255], [0, 0, 0],       [255, 255, 255],
+      [255, 255, 255], [0, 0, 0],       [255, 255, 255], [0, 0, 0],
+      [0, 0, 0],       [255, 255, 255], [0, 0, 0],       [255, 255, 255],
+    ],
+    goal: `
+      <p>נתונה תמונה בגודל <span class="dim">4×4</span> פיקסלים, השמורה ברשימה <code>pixels</code>.</p>
+      <p>צרו תמונה חדשה שבה כל פיקסל שחור <code>(0, 0, 0)</code> מוחלף בפיקסל בצבע טורקיז <code>(0, 200, 200)</code>. המשבצות הלבנות יישארו ללא שינוי.</p>
+      <p>כתבו לולאת <code>for</code> שעוברת על הרשימה <code>pixels</code>, ובונה רשימה חדשה בשם <code>turquoise_board</code>.</p>`,
+    starter: "turquoise_board = []\n",
+    solution: "turquoise_board = []\nfor r, g, b in pixels:\n    if r == 0 and g == 0 and b == 0:\n        turquoise_board.append((0, 200, 200))\n    else:\n        turquoise_board.append((r, g, b))\n",
+    resultVars: ["turquoise_board"],
+    rules: { requireFor: true },
+    hint: `בתוך הלולאה בדקו עם <code>if</code> אם הפיקסל שחור, כלומר אם שלושת הערכים שווים ל-0. אם כן, הוסיפו טורקיז. אחרת (<code>else</code>), הוסיפו את הפיקסל המקורי <code>(r, g, b)</code>.`,
+  },
+  {
+    id: "q5-dark-pink",
+    width: 4,
+    height: 3,
+    pixels: [
+      [255, 220, 230], [255, 180, 200], [255, 140, 180], [255, 100, 160],
+      [255, 80, 150],  [255, 60, 140],  [240, 40, 130],  [220, 20, 120],
+      [200, 0, 110],   [180, 0, 100],   [160, 0, 90],    [140, 0, 80],
+    ],
+    goal: `
+      <p>נתונה תמונה בגודל <span class="dim">4×3</span> פיקסלים, השמורה ברשימה <code>pixels</code>.</p>
+      <p>צרו תמונה חדשה ומוחשכת שבה כל ערוץ צבע (R, G, B) מופחת לחצי מגודלו המקורי. השתמשו בחילוק שלמים <code>// 2</code>.</p>
+      <p>כתבו לולאת <code>for</code> שעוברת על הרשימה <code>pixels</code>, ובונה רשימה חדשה בשם <code>dark_pink</code>.</p>`,
+    starter: "dark_pink = []\n",
+    solution: "dark_pink = []\nfor r, g, b in pixels:\n    new_pixel = (r // 2, g // 2, b // 2)\n    dark_pink.append(new_pixel)\n",
+    resultVars: ["dark_pink"],
+    rules: { requireFor: true },
+    hint: `חילוק שלמים <code>//</code> נותן מספר שלם, למשל <code>255 // 2</code> הוא <code>127</code>. צרו טאפל חדש שבו כל אחד משלושת הערכים מחולק ב-2.`,
+  },
+
+  /* ---------------- תרגילי אתגר (challenge: true) ---------------- */
+  {
+    id: "c6-grayscale",
+    challenge: true,
+    width: 3,
+    height: 3,
+    pixels: [
+      [0, 0, 0],       [0, 0, 0],       [0, 0, 0],
+      [255, 0, 0],     [255, 0, 0],     [255, 0, 0],
+      [255, 200, 0],   [255, 200, 0],   [255, 200, 0],
+    ],
+    goal: `
+      <p>נתונה תמונה בגודל <span class="dim">3×3</span> פיקסלים, השמורה ברשימה <code>pixels</code>.</p>
+      <p>צרו תמונה חדשה בגווני אפור. לכל פיקסל מחשבים את ממוצע הצבעים <code>(r + g + b) // 3</code> ומגדירים את הטאפל החדש כ-<code>(avg, avg, avg)</code>.</p>
+      <p>כתבו לולאת <code>for</code> שעוברת על הרשימה <code>pixels</code>, ובונה רשימה חדשה בשם <code>gray_pixels</code>.</p>`,
+    starter: "gray_pixels = []\n",
+    solution: "gray_pixels = []\nfor r, g, b in pixels:\n    avg = (r + g + b) // 3\n    gray_pixels.append((avg, avg, avg))\n",
+    resultVars: ["gray_pixels"],
+    rules: { requireFor: true },
+    hint: `בתוך הלולאה חשבו קודם את <code>avg</code> ושמרו אותו במשתנה. אחר כך הוסיפו לרשימה טאפל שבו שלושת הערכים הם <code>avg</code>.`,
+  },
+  {
+    id: "c7-reverse",
+    challenge: true,
+    width: 4,
+    height: 4,
+    pixels: [
+      [0, 255, 0], [0, 240, 0], [0, 225, 0], [0, 210, 0],
+      [0, 195, 0], [0, 180, 0], [0, 165, 0], [0, 150, 0],
+      [0, 135, 0], [0, 120, 0], [0, 105, 0], [0, 90, 0],
+      [0, 75, 0],  [0, 60, 0],  [0, 45, 0],  [0, 30, 0],
+    ],
+    goal: `
+      <p>נתונה תמונה בגודל <span class="dim">4×4</span> פיקסלים, השמורה ברשימה <code>pixels</code>.</p>
+      <p>צרו תמונה חדשה שבה סדר הפיקסלים הפוך לחלוטין: הפיקסל הכהה ביותר יהפוך לראשון, והבהיר ביותר לאחרון.</p>
+      <p>כתבו קוד שבונה רשימה חדשה בשם <code>reversed_pixels</code> המכילה את הפיקסלים בסדר הפוך.</p>`,
+    starter: "reversed_pixels = []\n",
+    // גם reversed_pixels = pixels[::-1] מתקבל, כי אין כאן דרישה ללולאה
+    solution: "reversed_pixels = []\nfor pixel in pixels:\n    reversed_pixels.insert(0, pixel)\n",
+    resultVars: ["reversed_pixels"],
+    rules: {},
+    hint: `הפעולה <code>insert(0, x)</code> מכניסה את <code>x</code> לתחילת הרשימה. מה יקרה אם תכניסו כל פיקסל לתחילת <code>reversed_pixels</code>?`,
+  },
+  {
+    id: "c8-negative",
+    challenge: true,
+    width: 4,
+    height: 4,
+    pixels: [
+      [100, 0, 200], [100, 0, 200], [100, 0, 200], [100, 0, 200],
+      [100, 0, 200], [255, 255, 0], [255, 255, 0], [100, 0, 200],
+      [100, 0, 200], [255, 255, 0], [255, 255, 0], [100, 0, 200],
+      [100, 0, 200], [100, 0, 200], [100, 0, 200], [100, 0, 200],
+    ],
+    goal: `
+      <p>נתונה תמונה בגודל <span class="dim">4×4</span> פיקסלים, השמורה ברשימה <code>pixels</code>.</p>
+      <p>צרו תמונה חדשה המייצגת את תמונת הנגטיב (היפוך צבעים). כל ערוץ צבע X מוחלף בערך ההפוך שלו: <code>255 - X</code>.</p>
+      <p>כתבו לולאת <code>for</code> שעוברת על הרשימה <code>pixels</code>, ובונה רשימה חדשה בשם <code>negative_pixels</code>.</p>`,
+    starter: "negative_pixels = []\n",
+    solution: "negative_pixels = []\nfor r, g, b in pixels:\n    new_pixel = (255 - r, 255 - g, 255 - b)\n    negative_pixels.append(new_pixel)\n",
+    resultVars: ["negative_pixels"],
+    rules: { requireFor: true },
+    hint: `מחשבים <code>255 - x</code> לכל אחד משלושת הערוצים. למשל, הערך 100 הופך ל-155, והערך 0 הופך ל-255.`,
+  },
+  {
+    id: "c9-black-white",
+    challenge: true,
+    width: 4,
+    height: 3,
+    pixels: [
+      [200, 150, 100], [30, 40, 50],   [255, 200, 220], [10, 10, 10],
+      [120, 130, 140], [240, 255, 0],  [0, 100, 200],   [180, 180, 180],
+      [50, 200, 50],   [100, 0, 0],    [220, 220, 100], [80, 90, 100],
+    ],
+    goal: `
+      <p>נתונה תמונה בגודל <span class="dim">4×3</span> פיקסלים, השמורה ברשימה <code>pixels</code>.</p>
+      <p>צרו תמונה חדשה בשחור-לבן מוחלט. מחשבים לכל פיקסל את הממוצע <code>avg = (r + g + b) // 3</code>.</p>
+      <p>אם הממוצע גדול מ-128, הפיקסל הופך ללבן <code>(255, 255, 255)</code>. אחרת, הפיקסל הופך לשחור <code>(0, 0, 0)</code>.</p>
+      <p>כתבו לולאת <code>for</code> שעוברת על הרשימה <code>pixels</code>, ובונה רשימה חדשה בשם <code>bw_pixels</code>.</p>`,
+    starter: "bw_pixels = []\n",
+    solution: "bw_pixels = []\nfor r, g, b in pixels:\n    avg = (r + g + b) // 3\n    if avg > 128:\n        bw_pixels.append((255, 255, 255))\n    else:\n        bw_pixels.append((0, 0, 0))\n",
+    resultVars: ["bw_pixels"],
+    rules: { requireFor: true },
+    hint: `חשבו את <code>avg</code> כמו בשאלה 6, ואז השתמשו ב-<code>if</code> וב-<code>else</code> כדי לבחור בין לבן לשחור.`,
+  },
+];
+
+/* ================================================================
+   כלים קטנים
+   ================================================================ */
+const $ = (id) => document.getElementById(id);
+function el(tag, cls, text) {
+  const node = document.createElement(tag);
+  if (cls) node.className = cls;
+  if (text != null) node.textContent = text;
+  return node;
+}
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+/* טקסט עם `קוד` בין גרשיים הפוכים הופך ל-<code> */
+function rich(s) { return escapeHtml(s).replace(/`([^`]+)`/g, "<code>$1</code>"); }
+const tupleText = (px) => (px ? `(${px[0]}, ${px[1]}, ${px[2]})` : "?");
+function lin(c) { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }
+function labelColor(px) {
+  const L = 0.2126 * lin(px[0]) + 0.7152 * lin(px[1]) + 0.0722 * lin(px[2]);
+  return (L + 0.05) / 0.05 >= 1.05 / (L + 0.05) ? "#111318" : "#FFFFFF";
+}
+const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const wideLayout = window.matchMedia("(min-width: 981px)");
+
+/* ================================================================
+   שמירה בדפדפן
+   ================================================================ */
+const store = {
+  read() {
+    try { const raw = localStorage.getItem(STORAGE_KEY); return raw ? JSON.parse(raw) || {} : {}; }
+    catch (e) { return {}; }
+  },
+  write(data) {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch (e) { /* אין אחסון, ממשיכים בלי */ }
+  },
+};
+const saved = store.read();
+const state = {
+  index: 0,
+  codes: saved.codes && typeof saved.codes === "object" ? saved.codes : {},
+  solved: saved.solved && typeof saved.solved === "object" ? saved.solved : {},
+  running: false,
+  runToken: 0,
+};
+const hashMatch = /^#q(\d+)$/.exec(location.hash);
+if (hashMatch) state.index = Number(hashMatch[1]) - 1;
+else if (Number.isInteger(saved.index)) state.index = saved.index;
+state.index = Math.max(0, Math.min(QUESTIONS.length - 1, state.index));
+function persist() { store.write({ codes: state.codes, solved: state.solved, index: state.index }); }
+
+/* ================================================================
+   מנוע הפייתון (Pyodide, ואם הוא לא נטען: MicroPython), בתוך Web Worker
+   ================================================================ */
+/* שני מנועים: Pyodide (פייתון מלא) כברירת מחדל, ו-MicroPython (קטן וחסכוני בזיכרון) כגיבוי.
+   אם Pyodide לא נטען, למשל בדפדפן של 32 ביט, האתר עובר לבד ל-MicroPython,
+   וזוכר את הבחירה בדפדפן הזה למשך כמה ימים כדי לא לנסות שוב בכל פתיחה. */
+const ENGINES = {
+  pyodide: { worker: "worker-src", runner: "py-runner", url: PYODIDE_URL, module: false },
+  micro: { worker: "worker-micro-src", runner: "py-runner-micro", url: MICROPYTHON_URL, module: true },
+};
+const ENGINE_KEY = "pixel-by-pixel:engine";
+const ENGINE_MEMORY_DAYS = 3;
+
+function rememberedEngine() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(ENGINE_KEY) || "null");
+    if (saved && saved.kind === "micro" && Date.now() - saved.at < ENGINE_MEMORY_DAYS * 864e5) return "micro";
+  } catch (e) { /* אין אחסון */ }
+  return "pyodide";
+}
+function rememberEngine(kind) {
+  try {
+    if (kind === "micro") localStorage.setItem(ENGINE_KEY, JSON.stringify({ kind, at: Date.now() }));
+    else localStorage.removeItem(ENGINE_KEY);
+  } catch (e) { /* אין אחסון */ }
+}
+
+/* בדיקת דרישות לפי טקסט הקוד, למנוע הגיבוי שאין בו ניתוח AST */
+function textRuleViolations(code, rules) {
+  const bare = code.replace(/("{3}[\s\S]*?"{3}|'{3}[\s\S]*?'{3}|"(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*'|#[^\n]*)/g, " ");
+  const found = [];
+  if (rules.noLoops && /\b(for|while)\b/.test(bare)) found.push("בשאלה הזו צריך לשנות כל פיקסל ישירות לפי האינדקס שלו, בלי לולאה.");
+  if (rules.requireFor && !/^[ \t]*for\b/m.test(bare)) found.push("בשאלה הזו צריך להשתמש בלולאת `for`.");
+  return found;
+}
+
+const Engine = (() => {
+  let kind = rememberedEngine();
+  let worker = null, ready = false, failed = false;
+  let pending = null, queued = null, timer = null, seq = 0;
+  let onState = () => {};
+
+  function start() {
+    ready = false; failed = false;
+    onState("loading", kind);
+    const cfg = ENGINES[kind];
+    let w;
+    try {
+      const url = URL.createObjectURL(new Blob([$(cfg.worker).textContent], { type: "text/javascript" }));
+      w = cfg.module ? new Worker(url, { type: "module" }) : new Worker(url);
+    } catch (err) { fail(String(err)); return; }
+    worker = w;
+    w.onmessage = (e) => { if (w === worker) handle(e.data); };
+    w.onerror = (e) => {
+      if (e.preventDefault) e.preventDefault();
+      if (w === worker) fail(e.message || "worker error");
+    };
+    w.postMessage({ type: "init", url: cfg.url, runner: $(cfg.runner).textContent });
+  }
+
+  function fail(message) {
+    clearTimeout(timer);
+    if (worker) { worker.terminate(); worker = null; }
+    ready = false;
+    if (kind === "pyodide") {
+      // המנוע הרגיל נכשל: עוברים למנוע הגיבוי. הרצה שחיכתה תישלח אליו כשיהיה מוכן.
+      console.warn("Pyodide לא נטען, עוברים ל-MicroPython:", message);
+      kind = "micro";
+      rememberEngine("micro");
+      if (pending) queued = pending.msg;
+      start();
+      return;
+    }
+    failed = true;
+    rememberEngine("pyodide");   // בפעם הבאה ננסה שוב את המנוע הרגיל
+    onState("error", kind, message);
+    const p = pending; pending = null; queued = null;
+    if (p) p.resolve({ status: "engine", message });
+  }
+
+  function handle(msg) {
+    if (msg.type === "ready") {
+      ready = true;
+      if (kind === "pyodide") rememberEngine("pyodide");
+      onState("ready", kind);
+      if (queued) { worker.postMessage(queued); queued = null; }
+      return;
+    }
+    if (msg.type === "fatal") { fail(msg.message); return; }
+    if (!pending || msg.runId !== pending.id) return;
+    if (msg.type === "packages") pending.onPhase("packages");
+    else if (msg.type === "exec-start") {
+      pending.onPhase("exec");
+      clearTimeout(timer);
+      timer = setTimeout(() => stop("timeout"), RUN_TIMEOUT_MS);
+    } else if (msg.type === "result") {
+      clearTimeout(timer);
+      const p = pending; pending = null;
+      p.resolve(msg.data);
+    }
+  }
+
+  function run(payload, onPhase = () => {}) {
+    if (failed) start();
+    return new Promise((resolve) => {
+      const id = ++seq;
+      const msg = { type: "run", runId: id, payload };
+      pending = { id, resolve, onPhase, msg };
+      if (ready) worker.postMessage(msg);
+      else { queued = msg; onPhase("waiting"); }
+    });
+  }
+
+  function stop(reason) {
+    clearTimeout(timer);
+    const p = pending; pending = null; queued = null;
+    if (worker) { worker.terminate(); worker = null; }
+    start();
+    if (p) p.resolve({ status: reason || "stopped" });
+  }
+
+  /* בדפדפן שמדווח שהוא 32 ביט מתחילים ישר במנוע הגיבוי, בלי להוריד את Pyodide לחינם */
+  async function boot() {
+    try {
+      if (kind === "pyodide" && navigator.userAgentData && navigator.userAgentData.getHighEntropyValues) {
+        const info = await navigator.userAgentData.getHighEntropyValues(["bitness"]);
+        if (info && info.bitness === "32") kind = "micro";
+      }
+    } catch (e) { /* לא ידוע, ממשיכים כרגיל */ }
+    start();
+  }
+
+  return { start: boot, run, stop, onState: (fn) => { onState = fn; } };
+})();
+
+Engine.onState((s, kind, message) => {
+  const box = $("engine");
+  const micro = kind === "micro";
+  box.dataset.state = s;
+  $("engine-text").textContent =
+    s === "ready" ? (micro ? "פייתון מוכן (גרסה קלה)" : "פייתון מוכן") :
+    s === "error" ? "פייתון לא נטען" : "טוען את פייתון…";
+  box.title =
+    s === "error" && message ? message :
+    s === "ready" && micro ? "הדפדפן הזה לא הצליח לטעון את המנוע הרגיל, ולכן נטען מנוע קל וחסכוני (MicroPython). כל השאלות עובדות, אבל חלק מהודעות השגיאה פחות מפורטות." : "";
+});
+
+/* ================================================================
+   עורך הקוד (CodeMirror, ואם לא נטען, תיבת טקסט פשוטה)
+   ================================================================ */
+function createEditor(host, onRun, onChange) {
+  if (window.CodeMirror) {
+    const cm = window.CodeMirror(host, {
+      value: "",
+      mode: "python",
+      lineNumbers: true,
+      indentUnit: 4,
+      tabSize: 4,
+      indentWithTabs: false,
+      direction: "ltr",
+      matchBrackets: true,
+      viewportMargin: Infinity,
+      extraKeys: {
+        "Ctrl-Enter": () => onRun(),
+        "Cmd-Enter": () => onRun(),
+        Tab: (c) => (c.somethingSelected() ? c.indentSelection("add") : c.replaceSelection("    ", "end")),
+        "Shift-Tab": (c) => c.indentSelection("subtract"),
+      },
+    });
+    let marked = null;
+    const clearError = () => { if (marked) { cm.removeLineClass(marked, "background", "cm-error-line"); marked = null; } };
+    cm.on("change", () => { clearError(); onChange(cm.getValue()); });
+    return {
+      get: () => cm.getValue(),
+      set: (v) => { cm.setValue(v); cm.clearHistory(); },
+      focus: () => cm.focus(),
+      refresh: () => cm.refresh(),
+      clearError,
+      markError(line) {
+        clearError();
+        if (line >= 1 && line <= cm.lineCount()) marked = cm.addLineClass(line - 1, "background", "cm-error-line");
+      },
+    };
+  }
+  const ta = el("textarea", "editor-fallback");
+  ta.dir = "ltr";
+  ta.spellcheck = false;
+  ta.setAttribute("aria-label", "עורך קוד");
+  ta.addEventListener("keydown", (e) => {
+    if (e.key === "Tab") {
+      e.preventDefault();
+      const s = ta.selectionStart;
+      ta.setRangeText("    ", s, ta.selectionEnd, "end");
+      onChange(ta.value);
+    } else if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault(); onRun();
+    }
+  });
+  ta.addEventListener("input", () => onChange(ta.value));
+  host.append(ta);
+  return { get: () => ta.value, set: (v) => { ta.value = v; }, focus: () => ta.focus(), refresh() {}, clearError() {}, markError() {} };
+}
+
+let saveTimer = null;
+const editor = createEditor($("editor"), () => run(), (value) => {
+  const q = QUESTIONS[state.index];
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => { storeCode(q, value); persist(); }, 300);
+});
+
+/* קוד שזהה לקוד ההתחלתי לא נשמר, כך ששינוי של הקוד ההתחלתי יגיע לכולם */
+function storeCode(q, value) {
+  if (value.trim() === q.starter.trim()) delete state.codes[q.id];
+  else state.codes[q.id] = value;
+}
+
+/* ================================================================
+   ציור תמונה כרשת של פיקסלים, עם הרשימה בפייתון מחוברת מתחתיה
+   ================================================================ */
+function gridSize(width, height) {
+  const longest = Math.max(width, height);
+  const side = Math.min(360, Math.max(200, longest * 90));
+  return { w: Math.round((side * width) / longest), h: Math.round((side * height) / longest) };
+}
+
+function listLines(tokens, width) {
+  const lines = [];
+  for (let i = 0; i < tokens.length; i += width) lines.push("    " + tokens.slice(i, i + width).join(", ") + ",");
+  return lines;
+}
+
+/* רוחב משוער של המלבן של הרשימה (וכך גם של התמונה), כדי להחליט אם יש מקום לשתי תמונות זו לצד זו */
+function naturalWidth(q) {
+  const longest = Math.max(0, ...listLines(q.pixels.map(tupleText), q.width).map((l) => l.length));
+  return Math.ceil(longest * 13 * 0.6 + 32);
+}
+
+const plainText = (s) => String(s).replace(/`/g, "");
+
+function buildPixelView({ width, height, pixels, varName = "", tokens = null, diff = [], notes = {}, animate = false, withCode = true, maxSize = null }) {
+  const n = width * height;
+  const size = gridSize(width, height);
+  const view = el("div", "pixel-view");
+
+  const grid = el("div", "px-grid");
+  grid.dir = "ltr";
+  grid.setAttribute("role", "img");
+  grid.setAttribute("aria-label", `תמונה בגודל ${width} על ${height} פיקסלים`);
+  grid.style.gridTemplateColumns = `repeat(${width}, minmax(0, 1fr))`;
+  grid.style.aspectRatio = `${width} / ${height}`;
+  // עם רשימה: התמונה ברוחב המלבן של הרשימה. בלי רשימה (תמונות בחלון הפלט): רוחב קבוע
+  grid.style.width = withCode ? "100%" : `${maxSize ? Math.min(maxSize, size.w) : size.w}px`;
+
+  const diffSet = new Set(diff);
+  const cells = [];
+  const toks = [];
+  let active = -1;
+  function deactivate() {
+    if (active < 0) return;
+    if (cells[active]) cells[active].classList.remove("is-active");
+    if (toks[active]) toks[active].classList.remove("is-active");
+    active = -1;
+  }
+  function activate(i) {
+    if (active === i) return;
+    deactivate();
+    active = i;
+    if (cells[i]) cells[i].classList.add("is-active");
+    if (toks[i]) toks[i].classList.add("is-active");
+  }
+
+  const step = animate ? Math.min(45, 560 / n) : 0;
+  for (let i = 0; i < n; i++) {
+    const px = pixels[i] || null;
+    const cell = el("div", "px");
+    if (px) {
+      cell.style.backgroundColor = `rgb(${px[0]}, ${px[1]}, ${px[2]})`;
+      cell.style.color = labelColor(px);   // צבע המסגרת שמסמנת את הפיקסל בריחוף
+    } else {
+      cell.classList.add("px-missing");
+    }
+    if (diffSet.has(i)) cell.classList.add("px-diff");
+    const note = notes[String(i)];
+    if (note) cell.title = plainText(note);
+    if (animate) { cell.classList.add("px-reveal"); cell.style.animationDelay = `${Math.round(i * step)}ms`; }
+    if (withCode) cell.addEventListener("mouseenter", () => activate(i));
+    cells.push(cell);
+    grid.append(cell);
+  }
+  grid.addEventListener("mouseleave", deactivate);
+  view.append(grid);
+
+  if (withCode) {
+    const list = tokens || pixels.slice(0, n).map((p) => tupleText(p || null));
+    const pre = el("pre", "list-code");
+    pre.dir = "ltr";
+    pre.append(el("span", "tok-name", varName), list.length ? " = [\n" : " = []");
+    list.forEach((text, i) => {
+      if (i % width === 0) pre.append("    ");
+      const tok = el("span", "tok", text);
+      if (diffSet.has(i) || i >= n) tok.classList.add("tok-diff");
+      const note = notes[String(i)];
+      if (note) { tok.classList.add("tok-bad"); tok.title = plainText(note); }
+      if (i < n) tok.addEventListener("mouseenter", () => activate(i));
+      toks.push(tok);
+      pre.append(tok);
+      if (i < list.length - 1) pre.append(i % width === width - 1 ? ",\n" : ", ");
+    });
+    if (list.length) pre.append("\n]");
+    pre.addEventListener("mouseleave", deactivate);
+    view.append(pre);
+
+    // התאמת גודל הגופן של הרשימה לרוחב הפנוי
+    const longest = Math.max(varName.length + 5, ...listLines(list, width).map((l) => l.length));
+    let observer = null;
+    const fit = () => {
+      if (!view.isConnected) { if (observer) observer.disconnect(); return; }
+      const host = view.closest(".stage-block") || view.parentElement;
+      const avail = host.clientWidth - 32;
+      if (avail <= 0) return;
+      pre.style.fontSize = `${Math.max(11, Math.min(13, avail / (longest * 0.61))).toFixed(2)}px`;
+    };
+    requestAnimationFrame(() => {
+      fit();
+      const host = view.closest(".stage-block");
+      if (host && "ResizeObserver" in window) { observer = new ResizeObserver(fit); observer.observe(host); }
+    });
+  }
+  return view;
+}
+
+/* מקום ריק לתמונה החדשה, באותו רוחב כמו התמונה הנתונה */
+function buildEmptyView(width, height, message) {
+  const view = el("div", "pixel-view");
+  const box = el("div", "px-empty");
+  box.style.aspectRatio = `${width} / ${height}`;
+  box.append(el("p", null, message));
+  view.append(box);
+  return view;
+}
+
+/* ================================================================
+   תצוגת שאלה
+   ================================================================ */
+function buildNav() {
+  const nav = $("qnav");
+  nav.replaceChildren();
+  let group = el("div", "qgroup");
+  nav.append(group);
+  QUESTIONS.forEach((q, i) => {
+    if (q.challenge && !(i > 0 && QUESTIONS[i - 1].challenge)) {
+      group = el("div", "qgroup");
+      group.append(el("span", "qnav-label", "אתגר"));
+      nav.append(group);
+    }
+    const b = el("button", "qtab", String(i + 1));
+    b.type = "button";
+    if (q.challenge) b.classList.add("is-challenge");
+    const solved = !!state.solved[q.id];
+    b.setAttribute("aria-label", `${questionTitle(i)}${solved ? " (נפתרה)" : ""}`);
+    if (i === state.index) b.setAttribute("aria-current", "step");
+    if (solved) b.classList.add("is-solved");
+    b.addEventListener("click", () => goTo(i));
+    group.append(b);
+  });
+}
+
+function updatePager() {
+  const q = QUESTIONS[state.index];
+  $("prev-btn").disabled = state.index === 0;
+  const next = $("next-btn");
+  next.disabled = state.index === QUESTIONS.length - 1;
+  next.classList.toggle("btn-primary", !!state.solved[q.id] && !next.disabled);
+}
+
+let splitObserver = null;
+let givenObserver = null;
+
+const questionTitle = (i) => `שאלה ${i + 1}${QUESTIONS[i].challenge ? ": אתגר" : ""}`;
+
+/* צבע הרקע של אזור התמונות: "ok" ירוק בהיר, "bad" אדום בהיר, "" אפור */
+function setStageVerdict(v) {
+  const stage = document.querySelector(".stage");
+  if (v) stage.dataset.verdict = v; else delete stage.dataset.verdict;
+}
+
+/* קונפטי של פיקסלים מרובעים, בצבעים של התמונה שנוצרה */
+function confetti(colors, host = document.body) {
+  if (reduceMotion) return;
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const r = document.querySelector(".stage").getBoundingClientRect();
+  const top = Math.max(0, r.top), bottom = Math.min(vh, r.bottom);
+  const visible = host === document.body && bottom - top > 80;
+  const cx = visible ? r.left + r.width / 2 : vw / 2;
+  const cy = visible ? top + (bottom - top) * 0.4 : vh * 0.4;
+  const spread = visible ? r.width : vw;
+
+  const canvas = document.createElement("canvas");
+  canvas.className = "confetti";
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  canvas.width = vw * dpr;
+  canvas.height = vh * dpr;
+  host.append(canvas);
+  const ctx = canvas.getContext("2d");
+  ctx.scale(dpr, dpr);
+
+  const palette = ["#FF0000", "#00FF00", "#0000FF", "#FFFFFF", ...colors];
+  const parts = Array.from({ length: 150 }, () => ({
+    x: cx + (Math.random() - 0.5) * spread * 0.35,
+    y: cy + (Math.random() - 0.5) * 40,
+    vx: (Math.random() - 0.5) * spread * 0.035,
+    vy: -(7 + Math.random() * 10),
+    size: 7 + Math.random() * 7,
+    rot: Math.random() * Math.PI,
+    vr: (Math.random() - 0.5) * 0.3,
+    color: palette[Math.floor(Math.random() * palette.length)],
+  }));
+  const start = performance.now();
+  const duration = 2600;
+  function frame(now) {
+    const t = now - start;
+    ctx.clearRect(0, 0, vw, vh);
+    ctx.globalAlpha = t < duration * 0.6 ? 1 : Math.max(0, 1 - (t - duration * 0.6) / (duration * 0.4));
+    for (const p of parts) {
+      p.vy += 0.34;
+      p.vx *= 0.985;
+      p.x += p.vx;
+      p.y += p.vy;
+      p.rot += p.vr;
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rot);
+      ctx.fillStyle = p.color;
+      ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = "rgba(21, 23, 27, 0.55)";
+      ctx.strokeRect(-p.size / 2, -p.size / 2, p.size, p.size);
+      ctx.restore();
+    }
+    if (t < duration) requestAnimationFrame(frame);
+    else canvas.remove();
+  }
+  requestAnimationFrame(frame);
+}
+function updateSplit() {
+  const q = QUESTIONS[state.index];
+  const box = $("stage-inner");
+  const cs = getComputedStyle(box);
+  const content = box.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  box.classList.toggle("is-split", content >= 2 * naturalWidth(q) + 28);
+}
+
+function resetResult() {
+  const q = QUESTIONS[state.index];
+  $("result-view").replaceChildren(buildEmptyView(q.width, q.height, "הריצו את הקוד כדי לראות כאן את התמונה החדשה."));
+  $("result-meta").textContent = "";
+}
+
+function renderQuestion() {
+  const q = QUESTIONS[state.index];
+  const number = state.index + 1;
+  $("q-title").textContent = questionTitle(state.index);
+  $("q-goal").innerHTML = q.goal;
+  const hint = $("q-hint");
+  hint.open = false;
+  hint.hidden = !q.hint;
+  $("q-hint-body").innerHTML = q.hint || "";
+
+  $("given-meta").innerHTML = `<span class="dim">${q.width}×${q.height}</span> פיקסלים`;
+  const givenView = buildPixelView({ width: q.width, height: q.height, pixels: q.pixels, varName: "pixels" });
+  $("given-view").replaceChildren(givenView);
+  if (givenObserver) givenObserver.disconnect();
+  const syncWidth = () => $("stage-inner").style.setProperty("--view-w", `${givenView.offsetWidth}px`);
+  if ("ResizeObserver" in window) { givenObserver = new ResizeObserver(syncWidth); givenObserver.observe(givenView); }
+  requestAnimationFrame(syncWidth);
+  setStageVerdict("");
+  resetResult();
+  updateSplit();
+  if (!splitObserver && "ResizeObserver" in window) {
+    splitObserver = new ResizeObserver(updateSplit);
+    splitObserver.observe($("stage-inner"));
+  }
+
+  editor.set(typeof state.codes[q.id] === "string" ? state.codes[q.id] : q.starter);
+  editor.clearError();
+  setStatus(null);
+  buildNav();
+  updatePager();
+  document.title = `${questionTitle(state.index)} | פיקסל אחר פיקסל`;
+  try { history.replaceState(null, "", `#q${number}`); } catch (e) { /* file:// */ }
+  requestAnimationFrame(() => editor.refresh());
+}
+
+function goTo(i) {
+  if (i < 0 || i >= QUESTIONS.length || i === state.index) return;
+  if (state.running) {
+    state.runToken++;
+    state.running = false;
+    setRunButton(false);
+    Engine.stop(null);
+  }
+  clearTimeout(saveTimer);
+  storeCode(QUESTIONS[state.index], editor.get());
+  state.index = i;
+  persist();
+  renderQuestion();
+  document.querySelector(".stage").scrollTop = 0;
+  document.querySelector(".task").scrollTop = 0;
+}
+
+/* ================================================================
+   הרצה ומשוב
+   ================================================================ */
+function setRunButton(running) {
+  const btn = $("run-btn");
+  btn.classList.toggle("is-running", running);
+  $("run-label").textContent = running ? "עצירה" : "הרצה";
+  $("run-ico").innerHTML = running ? '<rect x="2" y="2" width="10" height="10"/>' : '<path d="M2 1 L13 7 L2 13 Z"/>';
+}
+
+function setStatus(kind, verdict, parts = [], action = null) {
+  const box = $("status");
+  box.replaceChildren();
+  if (!kind) return;
+  const wrap = el("div", "status-box");
+  wrap.dataset.kind = kind;
+  wrap.append(el("div", "verdict", verdict));
+  const body = el("div", "status-body");
+  parts.forEach((part) => {
+    if (part instanceof Node) body.append(part);
+    else { const p = el("p"); p.innerHTML = part; body.append(p); }
+  });
+  if (action) body.append(action);
+  wrap.append(body);
+  box.append(wrap);
+}
+
+function emptyMessage(status) {
+  switch (status) {
+    case "syntax":
+    case "error": return "הקוד נעצר בגלל שגיאה, ולכן עדיין אין תמונה חדשה.";
+    case "timeout":
+    case "stopped": return "ההרצה נעצרה לפני שנוצרה תמונה.";
+    case "missing": return "לא נמצאה רשימה של פיקסלים להצגה.";
+    case "invalid": return "המשתנה שנוצר אינו רשימה של פיקסלים.";
+    default: return "הריצו את הקוד כדי לראות כאן את התמונה החדשה.";
+  }
+}
+
+function nextButton() {
+  if (state.index >= QUESTIONS.length - 1) return null;
+  const b = el("button", "btn btn-primary", "לשאלה הבאה");
+  b.type = "button";
+  b.addEventListener("click", () => goTo(state.index + 1));
+  return b;
+}
+
+function showResult(q, data, code) {
+  const n = q.width * q.height;
+  editor.clearError();
+
+  // הרצה של הקוד ההתחלתי כמו שהוא (למשל בשאלה 1, שבה מבקשים להריץ אותו) אינה נחשבת טעות
+  const onlyStarter = typeof code === "string" && code.trim() === q.starter.trim() && data.status === "wrong";
+  if (data.status === "correct") setStageVerdict("ok");
+  else if (onlyStarter || ["stopped", "engine", "internal"].includes(data.status)) setStageVerdict("");
+  else setStageVerdict("bad");
+
+  if (data.render) {
+    $("result-view").replaceChildren(buildPixelView({
+      width: q.width, height: q.height, pixels: data.render, varName: data.var, tokens: data.reprs || null,
+      diff: data.diff || [], notes: data.cellNotes || {}, animate: !reduceMotion,
+    }));
+    $("result-meta").innerHTML = `המשתנה <code>${escapeHtml(data.var)}</code>`;
+  } else {
+    $("result-view").replaceChildren(buildEmptyView(q.width, q.height, emptyMessage(data.status)));
+    $("result-meta").textContent = "";
+  }
+
+  const problems = (data.problems || []).map(rich);
+  const violations = (data.violations || []).map(rich);
+  const err = data.error;
+
+  switch (data.status) {
+    case "correct": {
+      const regular = QUESTIONS.filter((x) => !x.challenge);
+      const allSolved = (list) => list.every((x) => state.solved[x.id]);
+      const hadAll = allSolved(QUESTIONS);
+      const hadRegular = allSolved(regular);
+      state.solved[q.id] = true;
+      persist();
+      buildNav();
+      updatePager();
+      setStatus("ok", "נכון", ["כל הכבוד. התמונה שיצרתם זהה לתמונה המבוקשת."], nextButton());
+      const colors = [...new Set((data.render || []).filter(Boolean).map((p) => `rgb(${p[0]}, ${p[1]}, ${p[2]})`))];
+      if (!hadAll && allSolved(QUESTIONS)) setTimeout(() => showFinale(colors), 900);
+      else if (!hadRegular && allSolved(regular) && regular.length < QUESTIONS.length) setTimeout(() => showMilestone(colors), 900);
+      else requestAnimationFrame(() => confetti(colors));
+      break;
+    }
+    case "wrong": {
+      if (onlyStarter) {
+        setStatus("info", "הרצתם", ["זו התוצאה של הקוד הנתון. עכשיו השלימו את המשימה."]);
+        break;
+      }
+      const parts = [...problems];
+      const notes = data.cellNotes || {};
+      const diffCount = (data.diff || []).filter((i) => !notes[String(i)]).length;
+      if (data.unchanged) parts.push("התמונה לא השתנתה. בדקו שאתם משנים את הפיקסלים הנכונים.");
+      else if (diffCount) parts.push(`${diffCount} מתוך ${n} פיקסלים שונים ממה שציפינו. הם מסומנים ב-✕ בתמונה ובאדום ברשימה.`);
+      parts.push(...violations);
+      setStatus("bad", "עדיין לא", parts);
+      break;
+    }
+    case "almost":
+      setStatus("warn", "כמעט", [rich("הצבעים נכונים, אבל כל פיקסל צריך להיות טאפל בסוגריים עגולים, למשל `(r, g, 0)`, ולא רשימה בסוגריים מרובעים.")]);
+      break;
+    case "rule":
+      setStatus("warn", "כמעט", ["התמונה נכונה, אבל הדרך לא מתאימה לשאלה.", ...violations]);
+      break;
+    case "invalid":
+      setStatus("bad", "לא תקין", problems);
+      break;
+    case "missing":
+      setStatus("bad", "חסר", [rich(`לא נמצא משתנה בשם \`${q.resultVars[0]}\`. צרו אותו בקוד שלכם.`)]);
+      break;
+    case "syntax":
+    case "error": {
+      const parts = [];
+      parts.push(err && err.line ? `שגיאה בשורה ${err.line}.` : "שגיאה בזמן ההרצה.");
+      if (err) {
+        parts.push(el("code", "err-code", `${err.type}: ${err.message}`));
+        if (err.hint) parts.push(rich(err.hint));
+        if (err.line) editor.markError(err.line);
+      }
+      setStatus("bad", "שגיאה", parts);
+      break;
+    }
+    case "timeout":
+      setStatus("bad", "נעצר", [`הקוד רץ יותר מ-${RUN_TIMEOUT_MS / 1000} שניות ולכן נעצר. ייתכן שיש לולאה שלא מסתיימת.`]);
+      break;
+    case "stopped":
+      setStatus("info", "נעצר", ["ההרצה נעצרה."]);
+      break;
+    case "engine":
+      setStatus("bad", "תקלה", ["פייתון לא נטען. בדקו את החיבור לאינטרנט ורעננו את הדף.", el("code", "err-code", data.message || "")]);
+      break;
+    case "ran":
+      setStatus("info", "רץ", ["הקוד רץ עד הסוף.", ...problems, ...violations]);
+      break;
+    default:
+      setStatus("bad", "תקלה", ["משהו השתבש בהרצה.", el("code", "err-code", data.message || "")]);
+  }
+
+  if (data.solutionError) console.warn(`הפתרון של שאלה ${q.id} נכשל:`, data.solutionError);
+
+  if (wideLayout.matches) {
+    $("result-block").scrollIntoView({ block: "nearest", behavior: reduceMotion ? "auto" : "smooth" });
+  }
+}
+
+async function run() {
+  if (state.running) { Engine.stop("stopped"); return; }
+  const q = QUESTIONS[state.index];
+  const token = ++state.runToken;
+  state.running = true;
+  setRunButton(true);
+  setStatus("busy", "רץ", ["מריץ את הקוד…"]);
+  setStageVerdict("");
+  clearTimeout(saveTimer);
+  const code = editor.get();
+  storeCode(q, code);
+  persist();
+
+  const data = await Engine.run({
+    code,
+    solution: q.solution || "",
+    pixels: q.pixels,
+    width: q.width,
+    height: q.height,
+    resultVars: q.resultVars,
+    rules: q.rules || {},
+    violations: textRuleViolations(code, q.rules || {}),   // בשביל מנוע הגיבוי
+  }, (phase) => {
+    if (token !== state.runToken) return;
+    if (phase === "waiting") setStatus("busy", "ממתין", ["פייתון עדיין נטען. הקוד ירוץ מיד כשהטעינה תסתיים."]);
+    else if (phase === "packages") setStatus("busy", "טוען", ["טוען ספריות שהקוד צריך…"]);
+    else if (phase === "exec") setStatus("busy", "רץ", ["מריץ את הקוד…"]);
+  });
+
+  if (token !== state.runToken) return;
+  state.running = false;
+  setRunButton(false);
+  showResult(q, data, code);
+}
+
+/* ================================================================
+   הודעת "המשיכו לאתגר" ומסך הסיום
+   ================================================================ */
+function openDialog(d) {
+  if (typeof d.showModal === "function") { if (!d.open) d.showModal(); }
+  else d.setAttribute("open", "");
+}
+function closeDialog(d) {
+  if (typeof d.close === "function") d.close(); else d.removeAttribute("open");
+}
+
+function showMilestone(colors) {
+  const track = $("ms-track");
+  track.replaceChildren();
+  QUESTIONS.forEach((q, i) => {
+    if (q.challenge && !(i > 0 && QUESTIONS[i - 1].challenge)) track.append(el("i", "is-gap"));
+    track.append(el("i", q.challenge ? "is-challenge" : null));
+  });
+  const d = $("milestone");
+  openDialog(d);
+  $("ms-go").focus();
+  confetti(colors, d);
+}
+$("ms-go").addEventListener("click", () => {
+  closeDialog($("milestone"));
+  const firstOpen = QUESTIONS.findIndex((q) => q.challenge && !state.solved[q.id]);
+  const target = firstOpen >= 0 ? firstOpen : QUESTIONS.findIndex((q) => q.challenge);
+  if (target >= 0) goTo(target);
+});
+$("ms-close").addEventListener("click", () => closeDialog($("milestone")));
+
+/* גביע מפיקסלים: כל תו הוא פיקסל, נקודה היא פיקסל שקוף */
+const TROPHY = [
+  "..GGGGGGGGG..",
+  "GGGLGGGGGGDGG",
+  "G.GLGGGGGGD.G",
+  "G.GLGGGGGGD.G",
+  ".GGLGGGGGGDG.",
+  "..GLGGGGGGD..",
+  "...GLGGGGD...",
+  "....GGGGD....",
+  ".....GGD.....",
+  ".....GGD.....",
+  "....GGGGD....",
+  "..BBBBBBBBB..",
+  "..BBBBBBBBB..",
+];
+const TROPHY_COLORS = { G: "rgb(255, 196, 0)", L: "rgb(255, 236, 140)", D: "rgb(214, 140, 0)", B: "rgb(110, 62, 24)" };
+
+function showFinale(colors) {
+  const trophy = $("trophy");
+  trophy.replaceChildren();
+  TROPHY.forEach((row, y) => {
+    [...row].forEach((ch, x) => {
+      const px = el("i");
+      if (TROPHY_COLORS[ch]) {
+        px.className = "on";
+        px.style.background = TROPHY_COLORS[ch];
+        px.style.animationDelay = `${y * 70 + x * 8}ms`;
+      }
+      trophy.append(px);
+    });
+  });
+  const d = $("finale");
+  openDialog(d);
+  $("finale-close").focus();
+  setTimeout(() => confetti([...Object.values(TROPHY_COLORS), ...colors], d), 500);
+}
+$("finale-close").addEventListener("click", () => closeDialog($("finale")));
+
+/* ================================================================
+   כפתורים
+   ================================================================ */
+$("run-btn").addEventListener("click", () => run());
+$("prev-btn").addEventListener("click", () => goTo(state.index - 1));
+$("next-btn").addEventListener("click", () => goTo(state.index + 1));
+
+let resetArmed = null;
+function disarmReset() {
+  clearTimeout(resetArmed);
+  resetArmed = null;
+  const btn = $("reset-btn");
+  btn.textContent = "איפוס הקוד";
+  btn.classList.remove("is-armed");
+}
+$("reset-btn").addEventListener("click", () => {
+  const btn = $("reset-btn");
+  if (!resetArmed) {
+    btn.textContent = "לחצו שוב לאיפוס";
+    btn.classList.add("is-armed");
+    resetArmed = setTimeout(disarmReset, 3000);
+    return;
+  }
+  disarmReset();
+  const q = QUESTIONS[state.index];
+  editor.set(q.starter);
+  delete state.codes[q.id];
+  persist();
+  resetResult();
+  setStatus(null);
+  setStageVerdict("");
+  editor.focus();
+});
+
+document.addEventListener("keydown", (e) => {
+  if (e.defaultPrevented) return;
+  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); run(); }
+});
+window.addEventListener("hashchange", () => {
+  const m = /^#q(\d+)$/.exec(location.hash);
+  if (m) goTo(Number(m[1]) - 1);
+});
+
+/* ================================================================
+   התחלה
+   ================================================================ */
+renderQuestion();
+Engine.start();
+})();
+</script>
+</body>
+</html>
